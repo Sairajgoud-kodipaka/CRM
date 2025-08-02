@@ -373,7 +373,23 @@ class ApiService {
       }
 
       // Regular JSON response
-      const data = await response.json();
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('API Response text:', responseText);
+        
+        if (responseText.trim() === '') {
+          // Empty response, return success
+          data = null;
+        } else {
+          data = JSON.parse(responseText);
+        }
+      } catch (error) {
+        console.error('Failed to parse JSON response:', error);
+        // If JSON parsing fails, return success with empty data
+        data = null;
+      }
+      
       console.log('API Response data:', data);
       
       // Check if the response is already in ApiResponse format
@@ -566,7 +582,7 @@ class ApiService {
   }
 
   async createProductCategory(categoryData: Partial<Category>): Promise<ApiResponse<Category>> {
-    return this.request('/products/categories/', {
+    return this.request('/products/categories/create/', {
       method: 'POST',
       body: JSON.stringify(categoryData),
     });
@@ -734,6 +750,19 @@ class ApiService {
     return this.request('/auth/team-members/', {
       method: 'POST',
       body: JSON.stringify(memberData),
+    });
+  }
+
+  async updateTeamMember(id: string, memberData: Partial<User>): Promise<ApiResponse<User>> {
+    return this.request(`/auth/team-members/${id}/update/`, {
+      method: 'PUT',
+      body: JSON.stringify(memberData),
+    });
+  }
+
+  async deleteTeamMember(id: string): Promise<ApiResponse<void>> {
+    return this.request(`/auth/team-members/${id}/delete/`, {
+      method: 'DELETE',
     });
   }
 

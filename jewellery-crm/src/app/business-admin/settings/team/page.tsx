@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { apiService } from '@/lib/api-service';
 
 interface TeamMember {
-  id: number;
+  id: number; // Team member ID
+  user_id?: number; // User ID
   username: string;
   email: string;
   first_name: string;
@@ -62,6 +63,9 @@ export default function TeamSettingsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingMember, setCreatingMember] = useState(false);
+  const [deletingMember, setDeletingMember] = useState<number | null>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [createFormData, setCreateFormData] = useState<CreateTeamMemberData>({
     username: '',
     email: '',
@@ -172,6 +176,76 @@ export default function TeamSettingsPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleEditMember = (member: TeamMember) => {
+    setEditingMember(member);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateMember = async () => {
+    if (!editingMember) return;
+
+    try {
+      setCreatingMember(true);
+      setError(null);
+
+      const updateData = {
+        first_name: editingMember.first_name,
+        last_name: editingMember.last_name,
+        email: editingMember.email,
+        role: editingMember.role,
+        phone: editingMember.phone || '',
+        address: editingMember.address || '',
+        store: editingMember.store
+      };
+
+      console.log('Updating team member with data:', updateData);
+      console.log('Team member ID:', editingMember.id);
+
+      const response = await apiService.updateTeamMember(editingMember.id.toString(), updateData);
+      
+      console.log('Update response:', response);
+      
+      if (response.success) {
+        setShowEditModal(false);
+        setEditingMember(null);
+        setError(null);
+        await fetchTeamMembers(); // Refresh the list
+      } else {
+        setError(response.message || 'Failed to update team member');
+      }
+    } catch (error) {
+      console.error('Failed to update team member:', error);
+      setError('Failed to update team member');
+    } finally {
+      setCreatingMember(false);
+    }
+  };
+
+  const handleDeleteMember = async (memberId: number) => {
+    if (!confirm('Are you sure you want to delete this team member? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeletingMember(memberId);
+      setError(null);
+
+      const response = await apiService.deleteTeamMember(memberId.toString());
+      
+      if (response.success) {
+        setError(null);
+        await fetchTeamMembers(); // Refresh the list
+      } else {
+        setError(response.message || 'Failed to delete team member');
+      }
+    } catch (error) {
+      console.error('Failed to delete team member:', error);
+      setError('Failed to delete team member');
+    } finally {
+      setDeletingMember(null);
+    }
   };
 
   const getStatusBadge = (isActive: boolean) => {
@@ -401,6 +475,136 @@ export default function TeamSettingsPage() {
             </div>
           </DialogContent>
         </Dialog>
+        
+        {/* Edit Team Member Modal */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Team Member</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_first_name">First Name *</Label>
+                  <Input
+                    id="edit_first_name"
+                    value={editingMember?.first_name || ''}
+                    onChange={(e) => setEditingMember(prev => prev ? {...prev, first_name: e.target.value} : null)}
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_last_name">Last Name</Label>
+                  <Input
+                    id="edit_last_name"
+                    value={editingMember?.last_name || ''}
+                    onChange={(e) => setEditingMember(prev => prev ? {...prev, last_name: e.target.value} : null)}
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_email">Email *</Label>
+                <Input
+                  id="edit_email"
+                  type="email"
+                  value={editingMember?.email || ''}
+                  onChange={(e) => setEditingMember(prev => prev ? {...prev, email: e.target.value} : null)}
+                  placeholder="Enter email address"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_role">Role *</Label>
+                <Select value={editingMember?.role || ''} onValueChange={(value) => setEditingMember(prev => prev ? {...prev, role: value} : null)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inhouse_sales">In-House Sales</SelectItem>
+                    <SelectItem value="marketing">Marketing</SelectItem>
+                    <SelectItem value="tele_caller">Tele-Caller</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="sales">Sales</SelectItem>
+                    <SelectItem value="support">Support</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_phone">Phone Number</Label>
+                <Input
+                  id="edit_phone"
+                  value={editingMember?.phone || ''}
+                  onChange={(e) => setEditingMember(prev => prev ? {...prev, phone: e.target.value} : null)}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_address">Address</Label>
+                <Textarea
+                  id="edit_address"
+                  value={editingMember?.address || ''}
+                  onChange={(e) => setEditingMember(prev => prev ? {...prev, address: e.target.value} : null)}
+                  placeholder="Enter address"
+                  rows={3}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_store">Assign Store</Label>
+                <Select value={editingMember?.store?.toString() || 'none'} onValueChange={(value) => setEditingMember(prev => prev ? {...prev, store: value === 'none' ? undefined : parseInt(value, 10)} : null)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a store (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No store assigned</SelectItem>
+                    {!Array.isArray(stores) || stores.length === 0 ? (
+                      <SelectItem value="loading" disabled>Loading stores...</SelectItem>
+                    ) : (
+                      stores.map(store => (
+                        <SelectItem key={store.id} value={store.id.toString()}>{store.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={handleUpdateMember}
+                  disabled={creatingMember || !editingMember?.first_name || !editingMember?.email || !editingMember?.role}
+                  className="flex-1"
+                >
+                  {creatingMember ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Member'
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowEditModal(false)}
+                  disabled={creatingMember}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
       
       <Card className="p-4 flex flex-col gap-4">
@@ -471,11 +675,27 @@ export default function TeamSettingsPage() {
                       {getStatusBadge(member.is_active)}
                     </td>
                     <td className="px-4 py-2 flex gap-2">
-                      <Button variant="ghost" size="icon" title="Edit">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Edit"
+                        onClick={() => handleEditMember(member)}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" title="Delete" className="text-red-500 hover:text-red-700">
-                        <Trash2 className="w-4 h-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Delete" 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleDeleteMember(member.id)}
+                        disabled={deletingMember === member.id}
+                      >
+                        {deletingMember === member.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </td>
                   </tr>

@@ -368,40 +368,58 @@ export default function ProductActionsModal({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="cost_price">Cost Price *</Label>
-                <Input
-                  id="cost_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.cost_price}
-                  onChange={(e) => handleInputChange('cost_price', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  required
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+                  <Input
+                    id="cost_price"
+                    type="text"
+                    value={formData.cost_price === 0 ? '' : formData.cost_price.toString()}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      handleInputChange('cost_price', value ? parseFloat(value) : 0);
+                    }}
+                    placeholder="0.00"
+                    className="pl-8"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="selling_price">Selling Price *</Label>
-                <Input
-                  id="selling_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.selling_price}
-                  onChange={(e) => handleInputChange('selling_price', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  required
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+                  <Input
+                    id="selling_price"
+                    type="text"
+                    value={formData.selling_price === 0 ? '' : formData.selling_price.toString()}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      handleInputChange('selling_price', value ? parseFloat(value) : 0);
+                    }}
+                    placeholder="0.00"
+                    className="pl-8"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="discount_price">Discount Price</Label>
-                <Input
-                  id="discount_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.discount_price}
-                  onChange={(e) => handleInputChange('discount_price', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+                  <Input
+                    id="discount_price"
+                    type="text"
+                    value={formData.discount_price === 0 ? '' : formData.discount_price.toString()}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      handleInputChange('discount_price', value ? parseFloat(value) : 0);
+                    }}
+                    placeholder="0.00"
+                    className="pl-8"
+                  />
+                </div>
               </div>
             </div>
 

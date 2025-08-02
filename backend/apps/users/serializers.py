@@ -184,6 +184,8 @@ class TeamMemberListSerializer(serializers.ModelSerializer):
     Simplified serializer for team member lists.
     """
     # User fields that match frontend expectations
+    id = serializers.IntegerField(read_only=True)  # Team member ID
+    user_id = serializers.IntegerField(source='user.id', read_only=True)  # User ID
     first_name = serializers.CharField(source='user.first_name', read_only=True)
     last_name = serializers.CharField(source='user.last_name', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
@@ -193,6 +195,9 @@ class TeamMemberListSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     name = serializers.CharField(source='user.get_full_name', read_only=True)
+    tenant = serializers.PrimaryKeyRelatedField(source='user.tenant', read_only=True)
+    created_at = serializers.DateTimeField(source='user.date_joined', read_only=True)
+    updated_at = serializers.DateTimeField(source='user.date_joined', read_only=True)
     
     # Team member fields
     sales_percentage = serializers.ReadOnlyField()
@@ -201,9 +206,9 @@ class TeamMemberListSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = [
-            'id', 'first_name', 'last_name', 'email', 'role', 'phone', 
-            'store', 'is_active', 'username', 'name', 'employee_id',
-            'department', 'position', 'status', 'performance_rating',
+            'id', 'user_id', 'first_name', 'last_name', 'email', 'role', 'phone', 
+            'store', 'is_active', 'username', 'name', 'tenant', 'created_at', 'updated_at',
+            'employee_id', 'department', 'position', 'status', 'performance_rating',
             'sales_target', 'current_sales', 'sales_percentage',
             'performance_color', 'hire_date',
         ]
@@ -243,10 +248,8 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = [
-            'username', 'email', 'password', 'first_name', 'last_name',
-            'role', 'phone', 'address', 'department', 'position', 'hire_date',
-            'sales_target', 'manager_id', 'skills', 'notes',
-            'store',
+            'department', 'position', 'hire_date', 'sales_target', 
+            'manager_id', 'skills', 'notes'
         ]
 
     def validate_username(self, value):
@@ -272,22 +275,24 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # Extract user data
+        # Extract user data from the request data
+        request_data = self.context.get('request').data
+        
         user_data = {
-            'username': validated_data.pop('username'),
-            'email': validated_data.pop('email'),
-            'first_name': validated_data.pop('first_name'),
-            'last_name': validated_data.pop('last_name'),
-            'role': validated_data.pop('role'),
-            'phone': validated_data.pop('phone', ''),
-            'address': validated_data.pop('address', ''),
+            'username': request_data.get('username'),
+            'email': request_data.get('email'),
+            'first_name': request_data.get('first_name'),
+            'last_name': request_data.get('last_name'),
+            'role': request_data.get('role'),
+            'phone': request_data.get('phone', ''),
+            'address': request_data.get('address', ''),
             'is_active': True,  # Ensure user is active
-            'store': validated_data.pop('store', None),
+            'store': request_data.get('store'),
         }
-        password = validated_data.pop('password')
+        password = request_data.get('password')
         
         # Extract team member data
-        manager_id = validated_data.pop('manager_id', None)
+        manager_id = request_data.get('manager_id')
         
         # Create user
         user = User(**user_data)
@@ -326,6 +331,7 @@ class TeamMemberUpdateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False)
     phone = serializers.CharField(required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=User.Role.choices, required=False)
+    store = serializers.PrimaryKeyRelatedField(queryset=Store.objects.all(), required=False, allow_null=True)
     
     # Team member fields
     department = serializers.CharField(required=False, allow_blank=True)
@@ -340,7 +346,7 @@ class TeamMemberUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = [
-            'id', 'first_name', 'last_name', 'email', 'phone', 'role',
+            'id', 'first_name', 'last_name', 'email', 'phone', 'role', 'store',
             'department', 'position', 'hire_date', 'status', 'performance_rating',
             'sales_target', 'skills', 'notes'
         ]
@@ -355,7 +361,7 @@ class TeamMemberUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # Update user fields
         user_data = {}
-        for field in ['first_name', 'last_name', 'email', 'phone', 'role']:
+        for field in ['first_name', 'last_name', 'email', 'phone', 'role', 'store']:
             if field in validated_data:
                 user_data[field] = validated_data.pop(field)
         

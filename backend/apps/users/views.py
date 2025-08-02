@@ -316,13 +316,45 @@ class TeamMemberUpdateView(generics.UpdateAPIView):
 
     def perform_update(self, serializer):
         """Log activity when team member is updated."""
+        user = self.request.user
         team_member = serializer.save()
+        
+        # Prevent business admin from changing role of other business admins
+        if user.is_business_admin and team_member.user.role == 'business_admin' and user.id != team_member.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Business admins cannot modify other business admins.")
         
         TeamMemberActivity.objects.create(
             team_member=team_member,
             activity_type='task_completed',
             description=f'Team member {team_member.user.get_full_name()} profile was updated'
         )
+    
+    def update(self, request, *args, **kwargs):
+        """Override update method to return proper response."""
+        try:
+            print(f"Update request data: {request.data}")
+            partial = kwargs.pop('partial', False)
+            instance = self.get_object()
+            print(f"Updating team member: {instance.id}, user: {instance.user.id}")
+            
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            print(f"Update successful for team member: {instance.id}")
+            
+            return Response({
+                'success': True,
+                'message': 'Team member updated successfully',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Update error: {e}")
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TeamMemberDeleteView(generics.DestroyAPIView):
@@ -351,11 +383,31 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
 
     def perform_destroy(self, instance):
         """Log activity when team member is removed."""
+        user = self.request.user
         user_name = instance.user.get_full_name()
         user_id = instance.user.id
         
+        # Prevent business admin from deleting themselves
+        if user.id == instance.user.id:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You cannot delete your own account.")
+        
+        # Prevent business admin from deleting other business admins
+        if user.is_business_admin and instance.user.role == 'business_admin':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Business admins cannot delete other business admins.")
+        
         # Delete the team member (this will cascade to delete the user)
         instance.delete()
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to return proper response."""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({
+            'success': True,
+            'message': 'Team member deleted successfully'
+        }, status=status.HTTP_200_OK)
 
 
 class TeamMemberDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -905,6 +957,7 @@ def team_members_list(request):
     Get list of team members filtered by tenant.
     """
     from .models import TeamMember
+    from .serializers import TeamMemberListSerializer
     user = request.user
     
     # Filter team members based on user's role and tenant
@@ -921,26 +974,8 @@ def team_members_list(request):
         # Other users can only see themselves
         team_members = TeamMember.objects.filter(user__is_active=True, user=user)
     
-    members_data = []
-    for member in team_members:
-        members_data.append({
-            'id': member.user.id,
-            'username': member.user.username,
-            'email': member.user.email,
-            'first_name': member.user.first_name,
-            'last_name': member.user.last_name,
-            'role': member.user.role,
-            'name': member.user.get_full_name() or member.user.username,
-            'phone': member.user.phone,
-            'address': member.user.address,
-            'tenant': member.user.tenant.id if member.user.tenant else None,
-            'store': member.user.store.id if member.user.store else None,
-            'is_active': member.user.is_active,
-            'created_at': member.user.date_joined.isoformat(),
-            'updated_at': member.user.date_joined.isoformat(),
-        })
-    
-    return Response(members_data)
+    serializer = TeamMemberListSerializer(team_members, many=True)
+    return Response(serializer.data)
 
 
 

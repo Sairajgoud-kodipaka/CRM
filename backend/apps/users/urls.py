@@ -15,4 +15,7 @@ urlpatterns = [
     path('users/list/', views.users_list, name='users_list'),
     path('team-members/', views.TeamMemberListView.as_view(), name='team_members'),
     path('team-members/list/', views.team_members_list, name='team_members_list'),
+    path('team-members/<int:pk>/', views.TeamMemberDetailView.as_view(), name='team_member_detail'),
+    path('team-members/<int:pk>/update/', views.TeamMemberUpdateView.as_view(), name='team_member_update'),
+    path('team-members/<int:pk>/delete/', views.TeamMemberDeleteView.as_view(), name='team_member_delete'),
 ] 
