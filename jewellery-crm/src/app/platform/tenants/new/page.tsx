@@ -55,10 +55,20 @@ export default function NewTenantPage() {
       // Just ensure it's not empty and has some content
     }
     
+    // Clear error when user starts typing
+    if (error) {
+      setError(null);
+    }
+    
     setForm({ ...form, [e.target.name]: value });
   }
 
   function handleSelectChange(name: string, value: string) {
+    // Clear error when user makes a selection
+    if (error) {
+      setError(null);
+    }
+    
     setForm({ ...form, [name]: value });
   }
 
@@ -68,11 +78,7 @@ export default function NewTenantPage() {
     setError(null);
 
     try {
-      console.log('Creating tenant with data:', form);
-      console.log('Form data keys:', Object.keys(form));
-      console.log('Form data values:', Object.values(form));
-      
-      // Check for empty required fields
+      // Enhanced validation
       const requiredFields = ['name', 'admin_username', 'admin_email', 'admin_password'];
       const missingFields = requiredFields.filter(field => !form[field as keyof TenantFormData]);
       
@@ -82,13 +88,33 @@ export default function NewTenantPage() {
         return;
       }
       
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.admin_email)) {
+        setError('Please enter a valid email address for the admin account');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Validate password strength
+      if (form.admin_password.length < 8) {
+        setError('Admin password must be at least 8 characters long');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Validate business name
+      if (form.name.trim().length < 2) {
+        setError('Business name must be at least 2 characters long');
+        setSubmitting(false);
+        return;
+      }
+      
       const response = await apiService.createTenant(form);
       
       if (response.success) {
-        console.log('Tenant created successfully:', response.data);
         router.push('/platform/tenants');
       } else {
-        console.error('Failed to create tenant:', response.message);
         setError(`Failed to create tenant: ${response.message}`);
       }
     } catch (err) {

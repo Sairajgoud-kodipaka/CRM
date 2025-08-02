@@ -248,8 +248,9 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = [
-            'department', 'position', 'hire_date', 'sales_target', 
-            'manager_id', 'skills', 'notes'
+            'username', 'email', 'password', 'first_name', 'last_name', 'role',
+            'phone', 'address', 'store', 'department', 'position', 'hire_date', 
+            'sales_target', 'manager_id', 'skills', 'notes'
         ]
 
     def validate_username(self, value):
@@ -300,8 +301,12 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         }
         password = request_data.get('password')
         
-        # Extract team member data
-        manager_id = request_data.get('manager_id')
+        # Extract team member data - filter out user fields from validated_data
+        team_member_fields = ['department', 'position', 'hire_date', 'sales_target', 'manager_id', 'skills', 'notes']
+        team_member_data = {k: v for k, v in validated_data.items() if k in team_member_fields}
+        
+        # Extract manager_id separately
+        manager_id = team_member_data.pop('manager_id', None)
         
         # Create user
         user = User(**user_data)
@@ -315,8 +320,8 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         
         user.save()
         
-        # Create team member
-        team_member = TeamMember.objects.create(user=user, **validated_data)
+        # Create team member with only team member fields
+        team_member = TeamMember.objects.create(user=user, **team_member_data)
         
         # Set manager if provided
         if manager_id:
@@ -328,6 +333,32 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
                 pass
         
         return team_member
+
+    def to_representation(self, instance):
+        """Return a flattened representation that matches frontend expectations."""
+        return {
+            'id': instance.id,
+            'user_id': instance.user.id,
+            'username': instance.user.username,
+            'email': instance.user.email,
+            'first_name': instance.user.first_name,
+            'last_name': instance.user.last_name,
+            'name': instance.user.get_full_name(),
+            'role': instance.user.role,
+            'phone': instance.user.phone,
+            'address': instance.user.address,
+            'store': instance.user.store.id if instance.user.store else None,
+            'tenant': instance.user.tenant.id if instance.user.tenant else None,
+            'is_active': instance.user.is_active,
+            'created_at': instance.user.date_joined.isoformat(),
+            'updated_at': instance.user.date_joined.isoformat(),
+            'department': instance.department,
+            'position': instance.position,
+            'hire_date': instance.hire_date.isoformat() if instance.hire_date else None,
+            'sales_target': str(instance.sales_target) if instance.sales_target else '0.00',
+            'skills': instance.skills or [],
+            'notes': instance.notes,
+        }
 
 
 class TeamMemberUpdateSerializer(serializers.ModelSerializer):

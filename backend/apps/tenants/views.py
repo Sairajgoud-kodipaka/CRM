@@ -23,25 +23,16 @@ class TenantListView(generics.ListAPIView):
     permission_classes = [IsRoleAllowed.for_roles(['business_admin', 'platform_admin'])]
 
     def get(self, request, *args, **kwargs):
-        print(f"TenantListView.get called by user: {request.user.username} with role: {request.user.role}")
-        print(f"User is authenticated: {request.user.is_authenticated}")
-        print(f"User permissions: {request.user.get_all_permissions()}")
-        
         # Check if user has the required role
         if request.user.role not in ['business_admin', 'platform_admin']:
-            print(f"User role {request.user.role} not in allowed roles")
             return Response({'detail': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         
         # Get all tenants
         tenants = Tenant.objects.all()
-        print(f"Found {tenants.count()} tenants in database")
-        for tenant in tenants:
-            print(f"Tenant: {tenant.name} (ID: {tenant.id})")
         
         # Serialize the data
         serializer = self.get_serializer(tenants, many=True)
         data = serializer.data
-        print(f"Serialized data: {data}")
         
         return Response(data)
 
@@ -51,13 +42,9 @@ class TenantCreateView(generics.CreateAPIView):
     permission_classes = [IsRoleAllowed.for_roles(['business_admin', 'platform_admin'])]
 
     def create(self, request, *args, **kwargs):
-        print(f"TenantCreateView.create called with data: {request.data}")
-        
         admin_username = request.data.get('admin_username')
         admin_email = request.data.get('admin_email')
         admin_password = request.data.get('admin_password')
-        
-        print(f"Admin fields - username: {admin_username}, email: {admin_email}, password: {'*' * len(admin_password) if admin_password else 'None'}")
       
         if not (admin_username and admin_email and admin_password):
             missing_fields = []
@@ -71,36 +58,63 @@ class TenantCreateView(generics.CreateAPIView):
                 'detail': f'Admin username, email, and password are required. Missing: {", ".join(missing_fields)}'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validate password strength
+        if len(admin_password) < 8:
+            return Response({
+                'detail': 'Admin password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate email format
+        import re
+        email_regex = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+        if not email_regex.match(admin_email):
+            return Response({
+                'detail': 'Please enter a valid email address for the admin account'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if username or email already exists globally
+        if User.objects.filter(username=admin_username).exists():
+            return Response({
+                'detail': 'Admin username already exists in the system'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if User.objects.filter(email=admin_email).exists():
+            return Response({
+                'detail': 'Admin email already exists in the system'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Create the tenant first
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            print(f"Serializer validation errors: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        tenant = serializer.save()
-        print(f"Tenant created successfully: {tenant.name} (ID: {tenant.id})")
-        
-        # Create the admin user for this tenant
-        if User.objects.filter(username=admin_username, tenant=tenant).exists():
-            tenant.delete()
-            return Response({'detail': 'Admin username already exists for this tenant.'}, status=status.HTTP_400_BAD_REQUEST)
-        if User.objects.filter(email=admin_email, tenant=tenant).exists():
-            tenant.delete()
-            return Response({'detail': 'Admin email already exists for this tenant.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user = User.objects.create_user(
-            username=admin_username,
-            email=admin_email,
-            password=admin_password,
-            role=User.Role.BUSINESS_ADMIN,
-            tenant=tenant,
-            is_active=True
-        )
-        user.save()
-        print(f"Admin user created successfully: {user.username} (ID: {user.id})")
-        
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        try:
+            tenant = serializer.save()
+            
+            # Create the admin user for this tenant
+            user = User.objects.create_user(
+                username=admin_username,
+                email=admin_email,
+                password=admin_password,
+                role=User.Role.BUSINESS_ADMIN,
+                tenant=tenant,
+                is_active=True
+            )
+            
+            headers = self.get_success_headers(serializer.data)
+            return Response({
+                'success': True,
+                'message': 'Tenant and admin user created successfully',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED, headers=headers)
+            
+        except Exception as e:
+            # If anything goes wrong, clean up the tenant
+            if 'tenant' in locals():
+                tenant.delete()
+            return Response({
+                'detail': f'Failed to create tenant: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TenantDetailView(generics.RetrieveAPIView):
     queryset = Tenant.objects.all()
@@ -114,20 +128,73 @@ class TenantUpdateView(generics.UpdateAPIView):
     lookup_field = 'pk'
     
     def update(self, request, *args, **kwargs):
-        print(f"TenantUpdateView.update called with data: {request.data}")
-        print(f"Tenant ID: {kwargs.get('pk')}")
         try:
             response = super().update(request, *args, **kwargs)
-            print(f"Tenant updated successfully: {response.data}")
-            return response
+            return Response({
+                'success': True,
+                'message': 'Tenant updated successfully',
+                'data': response.data
+            }, status=status.HTTP_200_OK)
         except Exception as e:
-            print(f"Error updating tenant: {e}")
-            raise
+            return Response({
+                'detail': f'Failed to update tenant: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TenantDeleteView(generics.DestroyAPIView):
     queryset = Tenant.objects.all()
     serializer_class = TenantSerializer
-    permission_classes = [IsRoleAllowed.for_roles(['business_admin', 'platform_admin'])]
+    permission_classes = [IsRoleAllowed.for_roles(['platform_admin'])]
+
+    def perform_destroy(self, instance):
+        """Perform tenant deletion with proper cleanup."""
+        try:
+            # Get all related data for logging
+            user_count = instance.users.count()
+            client_count = Client.objects.filter(tenant=instance).count()
+            product_count = Product.objects.filter(tenant=instance).count()
+            sale_count = Sale.objects.filter(tenant=instance).count()
+            
+            print(f"Deleting tenant {instance.name} (ID: {instance.id})")
+            print(f"Related data to be deleted:")
+            print(f"- Users: {user_count}")
+            print(f"- Clients: {client_count}")
+            print(f"- Products: {product_count}")
+            print(f"- Sales: {sale_count}")
+            
+            # Delete all related data
+            # Note: This will cascade delete due to foreign key relationships
+            # but we're being explicit for better control and logging
+            
+            # Delete sales and related data
+            Sale.objects.filter(tenant=instance).delete()
+            SalesPipeline.objects.filter(tenant=instance).delete()
+            
+            # Delete products
+            Product.objects.filter(tenant=instance).delete()
+            
+            # Delete clients and related data
+            Client.objects.filter(tenant=instance).delete()
+            
+            # Delete users (this will cascade to team members)
+            instance.users.all().delete()
+            
+            # Finally delete the tenant
+            instance.delete()
+            
+            print(f"Successfully deleted tenant {instance.name} and all related data")
+            
+        except Exception as e:
+            print(f"Error deleting tenant {instance.name}: {e}")
+            raise
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to return proper response."""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({
+            'success': True,
+            'message': 'Tenant and all associated data deleted successfully'
+        }, status=status.HTTP_200_OK)
 
 
 class PlatformAdminDashboardView(APIView):
@@ -193,7 +260,6 @@ class PlatformAdminDashboardView(APIView):
             })
             
         except Exception as e:
-            print(f"Error in PlatformAdminDashboardView: {e}")
             return Response(
                 {'error': 'Failed to fetch platform dashboard data'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -264,15 +264,9 @@ const navigationItems: NavItem[] = [
     roles: ['manager'],
   },
   {
-    title: 'Customers',
-    href: '/manager/customers',
+    title: 'Team Management',
+    href: '/manager/team',
     icon: Users,
-    roles: ['manager'],
-  },
-  {
-    title: 'Sales Pipeline',
-    href: '/manager/pipeline',
-    icon: TrendingUp,
     roles: ['manager'],
   },
   {
@@ -282,21 +276,39 @@ const navigationItems: NavItem[] = [
     roles: ['manager'],
   },
   {
-    title: 'Orders',
-    href: '/manager/orders',
-    icon: ShoppingBag,
-    roles: ['manager'],
-  },
-  {
     title: 'Inventory',
     href: '/manager/inventory',
     icon: BarChart3,
     roles: ['manager'],
   },
   {
-    title: 'Store Promotions',
-    href: '/manager/store/promotions',
-    icon: Gem,
+    title: 'Customers',
+    href: '/manager/customers',
+    icon: Users,
+    roles: ['manager'],
+  },
+  {
+    title: 'Announcements',
+    href: '/manager/announcements',
+    icon: MessageSquare,
+    roles: ['manager'],
+  },
+  {
+    title: 'Products',
+    href: '/manager/products',
+    icon: Package,
+    roles: ['manager'],
+  },
+  {
+    title: 'Sales Pipeline',
+    href: '/manager/pipeline',
+    icon: TrendingUp,
+    roles: ['manager'],
+  },
+  {
+    title: 'Orders',
+    href: '/manager/orders',
+    icon: ShoppingBag,
     roles: ['manager'],
   },
   {
@@ -318,12 +330,6 @@ const navigationItems: NavItem[] = [
         roles: ['manager'],
       },
     ],
-  },
-  {
-    title: 'Team',
-    href: '/manager/team',
-    icon: Users,
-    roles: ['manager'],
   },
   {
     title: 'Analytics',

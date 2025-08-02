@@ -44,153 +44,143 @@ import {
 } from 'lucide-react';
 
 /**
- * Mock data for store metrics
+ * Store metrics interface
  */
-const storeMetrics = {
+interface StoreMetrics {
   store: {
-    name: 'Mumbai Central Store',
+    name: string;
     revenue: {
-      today: 45000,
-      thisMonth: 985000,
-      target: 1000000,
-      growth: 18.2,
-    },
+      today: number;
+      thisMonth: number;
+      target: number;
+      growth: number;
+    };
     customers: {
-      total: 456,
-      newToday: 3,
-      appointments: 8,
-    },
+      total: number;
+      newToday: number;
+      appointments: number;
+    };
     team: {
-      total: 8,
-      present: 7,
-      topPerformer: 'Anjali Gupta',
-    },
+      total: number;
+      present: number;
+      topPerformer: string;
+    };
     inventory: {
-      totalProducts: 245,
-      lowStock: 5,
-      newArrivals: 12,
-    },
-  },
-};
+      totalProducts: number;
+      lowStock: number;
+      newArrivals: number;
+    };
+  };
+}
 
 /**
- * Sales team performance data
+ * Team member interface
  */
-const teamPerformance = [
-  {
-    id: 1,
-    name: 'Anjali Gupta',
-    role: 'Senior Sales Executive',
-    sales: 285000,
-    customers: 42,
-    target: 300000,
-    avatar: null,
-    status: 'present',
-  },
-  {
-    id: 2,
-    name: 'Rahul Mehta',
-    role: 'Sales Executive',
-    sales: 195000,
-    customers: 28,
-    target: 200000,
-    avatar: null,
-    status: 'present',
-  },
-  {
-    id: 3,
-    name: 'Priya Singh',
-    role: 'Sales Executive',
-    sales: 175000,
-    customers: 31,
-    target: 180000,
-    avatar: null,
-    status: 'present',
-  },
-  {
-    id: 4,
-    name: 'Vikram Sharma',
-    role: 'Junior Sales Executive',
-    sales: 125000,
-    customers: 19,
-    target: 150000,
-    avatar: null,
-    status: 'absent',
-  },
-];
+interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  sales: number;
+  customers: number;
+  target: number;
+  avatar: string | null;
+  status: 'present' | 'absent';
+}
 
 /**
- * Today's appointments
+ * Appointment interface
  */
-const todaysAppointments = [
-  {
-    id: 1,
-    customer: 'Mrs. Sunita Agarwal',
-    time: '10:00 AM',
-    type: 'Wedding Consultation',
-    assignedTo: 'Anjali Gupta',
-    status: 'confirmed',
-  },
-  {
-    id: 2,
-    customer: 'Mr. Rajesh Kumar',
-    time: '11:30 AM',
-    type: 'Ring Resizing',
-    assignedTo: 'Rahul Mehta',
-    status: 'completed',
-  },
-  {
-    id: 3,
-    customer: 'Ms. Kavya Nair',
-    time: '2:00 PM',
-    type: 'Earring Selection',
-    assignedTo: 'Priya Singh',
-    status: 'confirmed',
-  },
-  {
-    id: 4,
-    customer: 'Mrs. Deepika Shah',
-    time: '4:30 PM',
-    type: 'Custom Design',
-    assignedTo: 'Anjali Gupta',
-    status: 'pending',
-  },
-];
+interface Appointment {
+  id: number;
+  customer: string;
+  time: string;
+  type: string;
+  assignedTo: string;
+  status: 'confirmed' | 'completed' | 'pending' | 'cancelled';
+}
 
 /**
- * Recent store activities
+ * Store activity interface
  */
-const storeActivities = [
-  {
-    id: 1,
-    type: 'sale',
-    description: 'Gold necklace set sold to Mrs. Sharma',
-    amount: 85000,
-    employee: 'Anjali Gupta',
-    time: '1 hour ago',
-  },
-  {
-    id: 2,
-    type: 'customer',
-    description: 'New customer registration completed',
-    customer: 'Mr. Arjun Patel',
-    employee: 'Priya Singh',
-    time: '2 hours ago',
-  },
-  {
-    id: 3,
-    type: 'inventory',
-    description: 'Diamond rings restocked',
-    quantity: 15,
-    employee: 'Store Manager',
-    time: '3 hours ago',
-  },
-];
+interface StoreActivity {
+  id: number;
+  type: 'sale' | 'customer' | 'inventory';
+  description: string;
+  amount?: number;
+  customer?: string;
+  quantity?: number;
+  employee: string;
+  time: string;
+}
 
 /**
  * Store Manager Dashboard Component
  */
 export function StoreManagerDashboard() {
+  const [storeMetrics, setStoreMetrics] = React.useState<StoreMetrics>({
+    store: {
+      name: 'Loading...',
+      revenue: { today: 0, thisMonth: 0, target: 1000000, growth: 0 },
+      customers: { total: 0, newToday: 0, appointments: 0 },
+      team: { total: 0, present: 0, topPerformer: '' },
+      inventory: { totalProducts: 0, lowStock: 0, newArrivals: 0 },
+    },
+  });
+  const [teamPerformance, setTeamPerformance] = React.useState<TeamMember[]>([]);
+  const [todaysAppointments, setTodaysAppointments] = React.useState<Appointment[]>([]);
+  const [storeActivities, setStoreActivities] = React.useState<StoreActivity[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch dashboard stats
+      const statsResponse = await fetch('/api/manager/dashboard-stats');
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStoreMetrics(statsData);
+      }
+
+      // Fetch team performance
+      const teamResponse = await fetch('/api/manager/team-performance');
+      if (teamResponse.ok) {
+        const teamData = await teamResponse.json();
+        setTeamPerformance(teamData);
+      }
+
+      // Fetch today's appointments
+      const appointmentsResponse = await fetch('/api/manager/today-appointments');
+      if (appointmentsResponse.ok) {
+        const appointmentsData = await appointmentsResponse.json();
+        setTodaysAppointments(appointmentsData);
+      }
+
+      // Fetch recent activities
+      const activitiesResponse = await fetch('/api/manager/recent-activities');
+      if (activitiesResponse.ok) {
+        const activitiesData = await activitiesResponse.json();
+        setStoreActivities(activitiesData);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <DashboardLayout
       title="Store Dashboard"

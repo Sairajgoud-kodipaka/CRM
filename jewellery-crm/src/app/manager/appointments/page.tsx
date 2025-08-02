@@ -1,26 +1,62 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Eye } from 'lucide-react';
-
-const stats = [
-  { label: 'Total Appointments', value: 12 },
-  { label: 'Upcoming', value: 4 },
-  { label: 'Completed', value: 6 },
-  { label: 'Cancelled', value: 2 },
-];
-
-const appointments = [
-  { customer: 'Varun T.', datetime: '7/30/2025, 10:00 AM', type: 'Consultation', status: 'upcoming' },
-  { customer: 'Padma I.', datetime: '7/29/2025, 2:00 PM', type: 'Pickup', status: 'completed' },
-  { customer: 'Hanuman', datetime: '7/28/2025, 11:00 AM', type: 'Repair', status: 'cancelled' },
-];
+import { apiService, Appointment } from '@/lib/api-service';
 
 export default function ManagerAppointmentsPage() {
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getAppointments();
+      if (response.success && response.data && Array.isArray(response.data)) {
+        setAppointments(response.data);
+      } else {
+        console.warn('Appointments response is not an array:', response.data);
+        setAppointments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredAppointments = Array.isArray(appointments) ? appointments.filter(appointment => {
+    const matchesSearch = appointment.purpose.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  }) : [];
+
+  const stats = [
+    { label: 'Total Appointments', value: Array.isArray(appointments) ? appointments.length : 0 },
+    { label: 'Upcoming', value: Array.isArray(appointments) ? appointments.filter(a => a.status === 'confirmed').length : 0 },
+    { label: 'Completed', value: Array.isArray(appointments) ? appointments.filter(a => a.status === 'completed').length : 0 },
+    { label: 'Cancelled', value: Array.isArray(appointments) ? appointments.filter(a => a.status === 'cancelled').length : 0 },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
@@ -59,21 +95,37 @@ export default function ManagerAppointmentsPage() {
               <tr>
                 <th className="px-4 py-2 text-left font-semibold text-text-secondary">Customer</th>
                 <th className="px-4 py-2 text-left font-semibold text-text-secondary">Date/Time</th>
-                <th className="px-4 py-2 text-left font-semibold text-text-secondary">Type</th>
+                <th className="px-4 py-2 text-left font-semibold text-text-secondary">Purpose</th>
                 <th className="px-4 py-2 text-left font-semibold text-text-secondary">Status</th>
                 <th className="px-4 py-2 text-left font-semibold text-text-secondary">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {appointments.map((a, i) => (
-                <tr key={i} className="border-t border-border hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-text-primary">{a.customer}</td>
-                  <td className="px-4 py-2 text-text-primary">{a.datetime}</td>
-                  <td className="px-4 py-2 text-text-primary">{a.type}</td>
-                  <td className="px-4 py-2"><Badge variant="outline" className="capitalize text-xs">{a.status}</Badge></td>
-                  <td className="px-4 py-2"><Button variant="ghost" size="icon"><Eye className="w-4 h-4" /></Button></td>
+              {filteredAppointments.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
+                    No appointments found.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                filteredAppointments.map((a, i) => (
+                  <tr key={i} className="border-t border-border hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium text-text-primary">Customer #{a.client}</td>
+                    <td className="px-4 py-2 text-text-primary">
+                      {new Date(a.date).toLocaleDateString()}, {a.time}
+                    </td>
+                    <td className="px-4 py-2 text-text-primary">{a.purpose}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant="outline" className="capitalize text-xs">{a.status}</Badge>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Button variant="ghost" size="icon">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

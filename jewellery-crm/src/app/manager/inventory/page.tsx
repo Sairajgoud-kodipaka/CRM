@@ -1,26 +1,65 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-
-const stats = [
-  { label: 'Total Items', value: 24 },
-  { label: 'Low Stock', value: 3 },
-  { label: 'Out of Stock', value: 1 },
-  { label: 'Inventory Value', value: '₹2,50,000' },
-];
-
-const inventory = [
-  { product: 'Gold Necklace', sku: 'SKU-001', stock: 10, status: 'in stock', updated: '7/30/2025' },
-  { product: 'Diamond Ring', sku: 'SKU-002', stock: 2, status: 'low stock', updated: '7/29/2025' },
-  { product: 'Silver Anklet', sku: 'SKU-003', stock: 0, status: 'out of stock', updated: '7/28/2025' },
-  { product: 'Platinum Bracelet', sku: 'SKU-004', stock: 12, status: 'in stock', updated: '7/27/2025' },
-];
+import { apiService, Product } from '@/lib/api-service';
 
 export default function ManagerInventoryPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getProducts();
+      if (response.success && response.data && Array.isArray(response.data)) {
+        setProducts(response.data);
+      } else {
+        console.warn('Products response is not an array:', response.data);
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = Array.isArray(products) ? products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'in stock' && product.quantity > product.min_quantity) ||
+                         (statusFilter === 'low stock' && product.quantity > 0 && product.quantity <= product.min_quantity) ||
+                         (statusFilter === 'out of stock' && product.quantity === 0);
+    
+    return matchesSearch && matchesStatus;
+  }) : [];
+
+  const stats = [
+    { label: 'Total Items', value: Array.isArray(products) ? products.length : 0 },
+    { label: 'Low Stock', value: Array.isArray(products) ? products.filter(p => p.quantity > 0 && p.quantity <= p.min_quantity).length : 0 },
+    { label: 'Out of Stock', value: Array.isArray(products) ? products.filter(p => p.quantity === 0).length : 0 },
+    { label: 'Inventory Value', value: `₹${(Array.isArray(products) ? (products.reduce((sum, p) => sum + (p.selling_price * p.quantity), 0) / 100000).toFixed(1) : '0.0')}L` },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-8">
       <div className="mb-2">
@@ -62,15 +101,37 @@ export default function ManagerInventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {inventory.map((item, i) => (
-                <tr key={i} className="border-t border-border hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-text-primary">{item.product}</td>
-                  <td className="px-4 py-2 text-text-primary">{item.sku}</td>
-                  <td className="px-4 py-2 text-text-primary">{item.stock}</td>
-                  <td className="px-4 py-2"><Badge variant="outline" className="capitalize text-xs">{item.status}</Badge></td>
-                  <td className="px-4 py-2 text-text-secondary">{item.updated}</td>
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
+                    No products found.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                filteredProducts.map((item, i) => {
+                  const getStockStatus = (product: Product) => {
+                    if (product.quantity === 0) return 'out of stock';
+                    if (product.quantity <= product.min_quantity) return 'low stock';
+                    return 'in stock';
+                  };
+                  
+                  return (
+                    <tr key={i} className="border-t border-border hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium text-text-primary">{item.name}</td>
+                      <td className="px-4 py-2 text-text-primary">{item.sku}</td>
+                      <td className="px-4 py-2 text-text-primary">{item.quantity}</td>
+                      <td className="px-4 py-2">
+                        <Badge variant="outline" className="capitalize text-xs">
+                          {getStockStatus(item)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2 text-text-secondary">
+                        {new Date(item.updated_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

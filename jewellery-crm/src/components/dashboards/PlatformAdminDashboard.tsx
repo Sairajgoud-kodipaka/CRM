@@ -79,7 +79,7 @@ export function PlatformAdminDashboard() {
         setLoading(true);
         setError(null);
         
-        const response = await apiService.request('/tenants/platform-dashboard/');
+        const response = await apiService.getPlatformAdminDashboard();
         
         if (response.success && response.data) {
           setMetrics(response.data);

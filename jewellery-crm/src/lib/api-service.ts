@@ -435,10 +435,6 @@ class ApiService {
   }
 
   async createTenant(tenantData: any): Promise<ApiResponse<any>> {
-    console.log('API Service - createTenant called with data:', tenantData);
-    console.log('API Service - createTenant data type:', typeof tenantData);
-    console.log('API Service - createTenant data keys:', Object.keys(tenantData));
-    
     return this.request('/tenants/create/', {
       method: 'POST',
       body: JSON.stringify(tenantData),
@@ -446,7 +442,13 @@ class ApiService {
   }
 
   async getTenants(): Promise<ApiResponse<any[]>> {
-    return this.request('/tenants/tenants/');
+    return this.request('/tenants/');
+  }
+
+  async deleteTenant(id: string): Promise<ApiResponse<void>> {
+    return this.request(`/tenants/${id}/delete/`, {
+      method: 'DELETE',
+    });
   }
 
   async logout(): Promise<ApiResponse<void>> {
