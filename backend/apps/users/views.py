@@ -218,6 +218,17 @@ class TeamMemberListView(generics.ListCreateAPIView):
             return TeamMemberCreateSerializer
         return TeamMemberSerializer
 
+    def create(self, request, *args, **kwargs):
+        """Override create method to add debugging and better error handling."""
+        try:
+            print(f"TeamMemberListView.create called with data: {request.data}")
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Error in TeamMemberListView.create: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
     def get_queryset(self):
         """Filter team members based on user's role, tenant, and store."""
         user = self.request.user
@@ -243,25 +254,8 @@ class TeamMemberListView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """Set tenant for new team members."""
-        team_member = serializer.save()
-        
-        # Log activity
-        TeamMemberActivity.objects.create(
-            team_member=team_member,
-            activity_type='task_completed',
-            description=f'Team member {team_member.user.get_full_name()} was added to the team'
-        )
-
-
-class TeamMemberCreateView(generics.CreateAPIView):
-    """
-    Create a new team member.
-    """
-    serializer_class = TeamMemberCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def perform_create(self, serializer):
         user = self.request.user
+        print(f"TeamMemberListView.perform_create for user: {user.username}, role: {user.role}")
 
         # Restrict manager to only create certain roles
         if user.role == 'manager':
@@ -279,6 +273,8 @@ class TeamMemberCreateView(generics.CreateAPIView):
                     pass
 
         team_member = serializer.save()
+        print(f"Team member created successfully: {team_member.id}")
+        
         # Update manager if provided
         manager_id = self.request.data.get('manager')
         if manager_id:
@@ -287,6 +283,66 @@ class TeamMemberCreateView(generics.CreateAPIView):
                 team_member.manager = manager
                 team_member.save()
             except TeamMember.DoesNotExist:
+                print(f"Manager with ID {manager_id} not found")
+                pass
+        
+        # Log activity
+        TeamMemberActivity.objects.create(
+            team_member=team_member,
+            activity_type='task_completed',
+            description=f'Team member {team_member.user.get_full_name()} was added to the team'
+        )
+
+
+class TeamMemberCreateView(generics.CreateAPIView):
+    """
+    Create a new team member.
+    """
+    serializer_class = TeamMemberCreateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        """Override create method to add debugging and better error handling."""
+        try:
+            print(f"Creating team member with data: {request.data}")
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Error creating team member: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        print(f"Performing create for user: {user.username}, role: {user.role}")
+
+        # Restrict manager to only create certain roles
+        if user.role == 'manager':
+            role = self.request.data.get('role')
+            if role not in ['inhouse_sales', 'marketing', 'tele_calling']:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Managers can only add In-house Sales, Marketing, or Tele-calling users.")
+
+            # Set manager field to self if not provided
+            if not self.request.data.get('manager'):
+                try:
+                    manager_tm = TeamMember.objects.get(user=user)
+                    serializer.validated_data['manager'] = manager_tm
+                except TeamMember.DoesNotExist:
+                    pass
+
+        team_member = serializer.save()
+        print(f"Team member created successfully: {team_member.id}")
+        
+        # Update manager if provided
+        manager_id = self.request.data.get('manager')
+        if manager_id:
+            try:
+                manager = TeamMember.objects.get(id=manager_id, user__tenant=user.tenant)
+                team_member.manager = manager
+                team_member.save()
+            except TeamMember.DoesNotExist:
+                print(f"Manager with ID {manager_id} not found")
                 pass
 
 

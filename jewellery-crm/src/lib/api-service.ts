@@ -537,6 +537,10 @@ class ApiService {
     return this.request(`/clients/audit-logs/?client=${clientId}`);
   }
 
+  async getCustomerDropdownOptions(): Promise<ApiResponse<any>> {
+    return this.request('/clients/clients/dropdown_options/');
+  }
+
   // Products
   async getProducts(params?: {
     page?: number;
@@ -725,6 +729,44 @@ class ApiService {
   }
 
   async updateAppointment(id: string, appointmentData: Partial<Appointment>): Promise<ApiResponse<Appointment>> {
+    return this.request(`/clients/appointments/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(appointmentData),
+    });
+  }
+
+  async confirmAppointment(id: string): Promise<ApiResponse<Appointment>> {
+    return this.request(`/clients/appointments/${id}/confirm/`, {
+      method: 'POST',
+    });
+  }
+
+  async completeAppointment(id: string, outcomeNotes?: string): Promise<ApiResponse<Appointment>> {
+    return this.request(`/clients/appointments/${id}/complete/`, {
+      method: 'POST',
+      body: JSON.stringify({ outcome_notes: outcomeNotes }),
+    });
+  }
+
+  async cancelAppointment(id: string, reason?: string): Promise<ApiResponse<Appointment>> {
+    return this.request(`/clients/appointments/${id}/cancel/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async rescheduleAppointment(id: string, newDate: string, newTime: string, reason?: string): Promise<ApiResponse<Appointment>> {
+    return this.request(`/clients/appointments/${id}/reschedule/`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        new_date: newDate, 
+        new_time: newTime, 
+        reason 
+      }),
+    });
+  }
+
+  async editAppointment(id: string, appointmentData: Partial<Appointment>): Promise<ApiResponse<Appointment>> {
     return this.request(`/clients/appointments/${id}/`, {
       method: 'PUT',
       body: JSON.stringify(appointmentData),

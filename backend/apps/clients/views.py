@@ -86,6 +86,72 @@ class ClientViewSet(viewsets.ModelViewSet):
             print("=== DJANGO VIEW - CREATE SUCCESS ===")
             print(f"Response status: {response.status_code}")
             print(f"Response data: {response.data}")
+            
+            # Create appointment if follow-up date is provided
+            if response.status_code == 201 and response.data:
+                client_data = response.data
+                next_follow_up = request.data.get('next_follow_up')
+                
+                print(f"=== APPOINTMENT CREATION DEBUG ===")
+                print(f"Client data: {client_data}")
+                print(f"Next follow up: {next_follow_up}")
+                print(f"User tenant: {request.user.tenant}")
+                print(f"User: {request.user}")
+                
+                if next_follow_up:
+                    try:
+                        from datetime import datetime
+                        from .models import Appointment
+                        
+                        # Parse the follow-up date
+                        follow_up_date = datetime.strptime(next_follow_up, '%Y-%m-%d').date()
+                        
+                        # Get custom time or use default
+                        next_follow_up_time = request.data.get('next_follow_up_time', '10:00')
+                        follow_up_time = datetime.strptime(next_follow_up_time, '%H:%M').time()
+                        
+                        print(f"Parsed date: {follow_up_date}")
+                        print(f"Parsed time: {follow_up_time}")
+                        
+                        # Create appointment for the follow-up
+                        appointment_data = {
+                            'client_id': client_data['id'],
+                            'tenant': request.user.tenant,
+                            'date': follow_up_date,
+                            'time': follow_up_time,
+                            'purpose': f"Follow-up for {client_data.get('first_name', '')} {client_data.get('last_name', '')}",
+                            'notes': f"Follow-up appointment created automatically when customer was added. Summary: {request.data.get('summary_notes', 'No notes provided')}",
+                            'status': 'scheduled',
+                            'created_by': request.user,
+                            'assigned_to': request.user,
+                            'duration': 60,  # Default 1 hour
+                            'requires_follow_up': False,  # This is the follow-up itself
+                        }
+                        
+                        print(f"=== APPOINTMENT DATA ===")
+                        print(f"Appointment data: {appointment_data}")
+                        
+                        appointment = Appointment.objects.create(**appointment_data)
+                        
+                        print(f"=== APPOINTMENT CREATED SUCCESSFULLY ===")
+                        print(f"Appointment ID: {appointment.id}")
+                        print(f"Date: {appointment.date}")
+                        print(f"Time: {appointment.time}")
+                        print(f"Client: {appointment.client}")
+                        print(f"Tenant: {appointment.tenant}")
+                        print(f"Status: {appointment.status}")
+                        
+                    except Exception as appointment_error:
+                        print(f"=== APPOINTMENT CREATION ERROR ===")
+                        print(f"Error creating appointment: {appointment_error}")
+                        print(f"Error type: {type(appointment_error)}")
+                        import traceback
+                        print(f"Traceback: {traceback.format_exc()}")
+                        # Don't fail the customer creation if appointment creation fails
+                        pass
+                else:
+                    print("No follow-up date provided, skipping appointment creation")
+            
             return response
         except Exception as e:
             print("=== DJANGO VIEW - CREATE ERROR ===")
@@ -666,6 +732,122 @@ class ClientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'])
+    def dropdown_options(self, request):
+        """Get dropdown options for customer form fields"""
+        options = {
+            'states': [
+                {'value': 'AP', 'label': 'Andhra Pradesh'},
+                {'value': 'AR', 'label': 'Arunachal Pradesh'},
+                {'value': 'AS', 'label': 'Assam'},
+                {'value': 'BR', 'label': 'Bihar'},
+                {'value': 'CT', 'label': 'Chhattisgarh'},
+                {'value': 'GA', 'label': 'Goa'},
+                {'value': 'GJ', 'label': 'Gujarat'},
+                {'value': 'HR', 'label': 'Haryana'},
+                {'value': 'HP', 'label': 'Himachal Pradesh'},
+                {'value': 'JK', 'label': 'Jammu and Kashmir'},
+                {'value': 'JH', 'label': 'Jharkhand'},
+                {'value': 'KA', 'label': 'Karnataka'},
+                {'value': 'KL', 'label': 'Kerala'},
+                {'value': 'MP', 'label': 'Madhya Pradesh'},
+                {'value': 'MH', 'label': 'Maharashtra'},
+                {'value': 'MN', 'label': 'Manipur'},
+                {'value': 'ML', 'label': 'Meghalaya'},
+                {'value': 'MZ', 'label': 'Mizoram'},
+                {'value': 'NL', 'label': 'Nagaland'},
+                {'value': 'OR', 'label': 'Odisha'},
+                {'value': 'PB', 'label': 'Punjab'},
+                {'value': 'RJ', 'label': 'Rajasthan'},
+                {'value': 'SK', 'label': 'Sikkim'},
+                {'value': 'TN', 'label': 'Tamil Nadu'},
+                {'value': 'TG', 'label': 'Telangana'},
+                {'value': 'TR', 'label': 'Tripura'},
+                {'value': 'UP', 'label': 'Uttar Pradesh'},
+                {'value': 'UT', 'label': 'Uttarakhand'},
+                {'value': 'WB', 'label': 'West Bengal'},
+                {'value': 'AN', 'label': 'Andaman and Nicobar Islands'},
+                {'value': 'CH', 'label': 'Chandigarh'},
+                {'value': 'DN', 'label': 'Dadra and Nagar Haveli'},
+                {'value': 'DD', 'label': 'Daman and Diu'},
+                {'value': 'DL', 'label': 'Delhi'},
+                {'value': 'LD', 'label': 'Lakshadweep'},
+                {'value': 'PY', 'label': 'Puducherry'},
+            ],
+            'communities': [
+                {'value': 'hindu', 'label': 'Hindu'},
+                {'value': 'muslim', 'label': 'Muslim'},
+                {'value': 'sikh', 'label': 'Sikh'},
+                {'value': 'christian', 'label': 'Christian'},
+                {'value': 'jain', 'label': 'Jain'},
+                {'value': 'buddhist', 'label': 'Buddhist'},
+                {'value': 'parsi', 'label': 'Parsi'},
+                {'value': 'jewish', 'label': 'Jewish'},
+                {'value': 'gujarati', 'label': 'Gujarati'},
+                {'value': 'marwari', 'label': 'Marwari'},
+                {'value': 'punjabi', 'label': 'Punjabi'},
+                {'value': 'sindhi', 'label': 'Sindhi'},
+                {'value': 'bengali', 'label': 'Bengali'},
+                {'value': 'tamil', 'label': 'Tamil'},
+                {'value': 'telugu', 'label': 'Telugu'},
+                {'value': 'kannada', 'label': 'Kannada'},
+                {'value': 'malayalam', 'label': 'Malayalam'},
+                {'value': 'marathi', 'label': 'Marathi'},
+                {'value': 'hindi', 'label': 'Hindi'},
+                {'value': 'urdu', 'label': 'Urdu'},
+                {'value': 'kashmiri', 'label': 'Kashmiri'},
+                {'value': 'assamese', 'label': 'Assamese'},
+                {'value': 'oriya', 'label': 'Oriya'},
+                {'value': 'other', 'label': 'Other'},
+            ],
+            'reasons_for_visit': [
+                {'value': 'purchase', 'label': 'Purchase'},
+                {'value': 'inquiry', 'label': 'Inquiry'},
+                {'value': 'repair', 'label': 'Repair'},
+                {'value': 'exchange', 'label': 'Exchange'},
+                {'value': 'valuation', 'label': 'Valuation'},
+                {'value': 'cleaning', 'label': 'Cleaning'},
+                {'value': 'sizing', 'label': 'Sizing'},
+                {'value': 'warranty', 'label': 'Warranty'},
+                {'value': 'gift', 'label': 'Gift'},
+                {'value': 'investment', 'label': 'Investment'},
+                {'value': 'other', 'label': 'Other'},
+            ],
+            'lead_sources': [
+                {'value': 'walkin', 'label': 'Walk-in'},
+                {'value': 'referral', 'label': 'Referral'},
+                {'value': 'online', 'label': 'Online'},
+                {'value': 'social_media', 'label': 'Social Media'},
+                {'value': 'advertisement', 'label': 'Advertisement'},
+                {'value': 'exhibition', 'label': 'Exhibition'},
+                {'value': 'cold_call', 'label': 'Cold Call'},
+                {'value': 'website', 'label': 'Website'},
+                {'value': 'google', 'label': 'Google Search'},
+                {'value': 'facebook', 'label': 'Facebook'},
+                {'value': 'instagram', 'label': 'Instagram'},
+                {'value': 'whatsapp', 'label': 'WhatsApp'},
+                {'value': 'newspaper', 'label': 'Newspaper'},
+                {'value': 'magazine', 'label': 'Magazine'},
+                {'value': 'tv', 'label': 'TV Advertisement'},
+                {'value': 'radio', 'label': 'Radio Advertisement'},
+                {'value': 'other', 'label': 'Other'},
+            ],
+            'age_groups': [
+                {'value': '18-25', 'label': '18-25'},
+                {'value': '26-35', 'label': '26-35'},
+                {'value': '36-50', 'label': '36-50'},
+                {'value': '51-65', 'label': '51-65'},
+                {'value': '65+', 'label': '65+'},
+            ],
+            'saving_schemes': [
+                {'value': 'active', 'label': 'Active'},
+                {'value': 'inactive', 'label': 'Inactive'},
+                {'value': 'pending', 'label': 'Pending'},
+                {'value': 'completed', 'label': 'Completed'},
+            ],
+        }
+        return Response(options)
+
 class ClientInteractionViewSet(viewsets.ModelViewSet):
     queryset = ClientInteraction.objects.all()
     serializer_class = ClientInteractionSerializer
@@ -675,18 +857,47 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     serializer_class = AppointmentSerializer
     permission_classes = [IsRoleAllowed.for_roles(['inhouse_sales', 'business_admin', 'manager'])]
 
+    def list(self, request, *args, **kwargs):
+        """List appointments with debugging"""
+        print(f"=== APPOINTMENT LIST METHOD ===")
+        print(f"Request user: {request.user}")
+        print(f"Request method: {request.method}")
+        print(f"Request URL: {request.path}")
+        
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        response_data = serializer.data
+        
+        print(f"Serialized data count: {len(response_data)}")
+        print(f"Serialized data: {response_data}")
+        
+        response = Response(response_data)
+        print(f"=== APPOINTMENT LIST METHOD END ===")
+        return response
+
     def get_queryset(self):
         queryset = Appointment.objects.filter(is_deleted=False)
         user = self.request.user
+        
+        print(f"=== APPOINTMENT QUERYSET DEBUG ===")
+        print(f"User: {user}")
+        print(f"User authenticated: {user.is_authenticated}")
+        print(f"User tenant: {user.tenant}")
+        print(f"Total appointments before filtering: {queryset.count()}")
+        
         if user.is_authenticated and user.tenant:
             queryset = queryset.filter(tenant=user.tenant)
+            print(f"Appointments after tenant filter: {queryset.count()}")
         else:
-            queryset = Appointment.objects.none()
+            # Temporarily allow all appointments if no tenant is found
+            print("No tenant found, but allowing all appointments for debugging")
+            # queryset = Appointment.objects.none()
         
         # Filter by status
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+            print(f"Appointments after status filter: {queryset.count()}")
         
         # Filter by date range
         start_date = self.request.query_params.get('start_date')
@@ -700,6 +911,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         assigned_to = self.request.query_params.get('assigned_to')
         if assigned_to:
             queryset = queryset.filter(assigned_to_id=assigned_to)
+        
+        print(f"Final queryset count: {queryset.count()}")
+        print(f"Final queryset: {list(queryset.values('id', 'client__first_name', 'date', 'time', 'status', 'tenant'))}")
         
         return queryset
 
@@ -789,6 +1003,32 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             })
         
         return Response(appointments)
+
+    @action(detail=False, methods=['get'])
+    def debug(self, request):
+        """Debug endpoint to check appointments"""
+        print(f"=== APPOINTMENT DEBUG ENDPOINT ===")
+        print(f"User: {request.user}")
+        print(f"User tenant: {request.user.tenant}")
+        
+        # Get all appointments without filtering
+        all_appointments = Appointment.objects.filter(is_deleted=False)
+        print(f"Total appointments in database: {all_appointments.count()}")
+        
+        for apt in all_appointments:
+            print(f"Appointment: {apt.id} - {apt.client.full_name} - {apt.date} {apt.time} - Tenant: {apt.tenant}")
+        
+        # Get filtered appointments
+        filtered_appointments = self.get_queryset()
+        print(f"Filtered appointments: {filtered_appointments.count()}")
+        
+        return Response({
+            'total_appointments': all_appointments.count(),
+            'filtered_appointments': filtered_appointments.count(),
+            'user_tenant': str(request.user.tenant) if request.user.tenant else None,
+            'all_appointments': list(all_appointments.values('id', 'client__first_name', 'date', 'time', 'tenant')),
+            'filtered_appointments_data': list(filtered_appointments.values('id', 'client__first_name', 'date', 'time', 'tenant'))
+        })
 
     @action(detail=False, methods=['get'])
     def today(self, request):

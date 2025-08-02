@@ -278,6 +278,15 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         # Extract user data from the request data
         request_data = self.context.get('request').data
         
+        # Handle store field - it comes as an ID, not an object
+        store_id = request_data.get('store')
+        store = None
+        if store_id:
+            try:
+                store = Store.objects.get(id=store_id)
+            except Store.DoesNotExist:
+                print(f"Store with ID {store_id} not found")
+        
         user_data = {
             'username': request_data.get('username'),
             'email': request_data.get('email'),
@@ -287,7 +296,7 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
             'phone': request_data.get('phone', ''),
             'address': request_data.get('address', ''),
             'is_active': True,  # Ensure user is active
-            'store': request_data.get('store'),
+            'store': store,
         }
         password = request_data.get('password')
         
@@ -299,8 +308,8 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         user.set_password(password)
         
         # Set tenant based on store or current user
-        if user_data['store']:
-            user.tenant = user_data['store'].tenant
+        if store:
+            user.tenant = store.tenant
         elif hasattr(self.context.get('request', None), 'user') and self.context['request'].user.tenant:
             user.tenant = self.context['request'].user.tenant
         

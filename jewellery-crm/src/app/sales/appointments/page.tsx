@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { apiService, Appointment } from '@/lib/api-service';
 import { Calendar, Eye, Search, Plus, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { AppointmentDetailModal } from '@/components/appointments/AppointmentDetailModal';
 
 interface AppointmentStats {
   totalAppointments: number;
@@ -26,6 +27,8 @@ export default function SalesAppointmentsPage() {
     completedAppointments: 0,
     cancelledAppointments: 0,
   });
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     fetchAppointments();
@@ -70,12 +73,17 @@ export default function SalesAppointmentsPage() {
   const fetchAppointments = async () => {
     try {
       setLoading(true);
+      console.log('=== FETCHING APPOINTMENTS ===');
       const response = await apiService.getAppointments();
       console.log('Appointments API response:', response);
+      console.log('Response success:', response.success);
+      console.log('Response data type:', typeof response.data);
+      console.log('Response data:', response.data);
       
       // Ensure we have an array of appointments
       const appointmentsData = Array.isArray(response.data) ? response.data : [];
       console.log('Processed appointments data:', appointmentsData);
+      console.log('Appointments count:', appointmentsData.length);
       
       setAppointments(appointmentsData);
     } catch (error) {
@@ -136,9 +144,8 @@ export default function SalesAppointmentsPage() {
   };
 
   const handleViewAppointment = (appointment: Appointment) => {
-    // This would navigate to appointment detail page
-    console.log('Viewing appointment:', appointment);
-    // In a real implementation, this would navigate to appointment detail
+    setSelectedAppointment(appointment);
+    setIsDetailModalOpen(true);
   };
 
   const handleCreateAppointment = () => {
@@ -282,6 +289,7 @@ export default function SalesAppointmentsPage() {
                         size="sm" 
                         className="text-blue-600 hover:text-blue-800"
                         onClick={() => handleViewAppointment(appointment)}
+                        title="View appointment details"
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -305,6 +313,16 @@ export default function SalesAppointmentsPage() {
           </div>
         )}
       </Card>
+
+      {/* Appointment Detail Modal */}
+      <AppointmentDetailModal
+        appointment={selectedAppointment}
+        open={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedAppointment(null);
+        }}
+      />
     </div>
   );
 }

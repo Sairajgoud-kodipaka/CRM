@@ -62,13 +62,18 @@ class SalesPipelineSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Create pipeline with proper client assignment"""
+        print(f"SalesPipelineSerializer.create called with: {validated_data}")
         client_id = validated_data.pop('client_id', None)
+        print(f"Client ID: {client_id}")
         if client_id:
             from apps.clients.models import Client
             try:
                 validated_data['client'] = Client.objects.get(id=client_id)
+                print(f"Client found: {validated_data['client']}")
             except Client.DoesNotExist:
+                print(f"Client with ID {client_id} not found")
                 raise serializers.ValidationError({"client_id": "Client not found."})
         else:
+            print("No client_id provided")
             raise serializers.ValidationError({"client_id": "Client is required."})
         return super().create(validated_data)
