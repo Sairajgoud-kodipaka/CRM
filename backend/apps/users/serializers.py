@@ -213,6 +213,12 @@ class TeamMemberListSerializer(serializers.ModelSerializer):
             'performance_color', 'hire_date',
         ]
 
+    def to_representation(self, instance):
+        """Add debugging to see what data is being serialized."""
+        data = super().to_representation(instance)
+        print(f"Serializing team member: {instance.user.get_full_name()} - Data: {data}")
+        return data
+
 
 class TeamMemberCreateSerializer(serializers.ModelSerializer):
     """
@@ -278,15 +284,23 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Extract user data from the request data
         request_data = self.context.get('request').data
+        request = self.context.get('request')
+        current_user = request.user if request else None
         
-        # Handle store field - it comes as an ID, not an object
-        store_id = request_data.get('store')
+        # Automatically assign store from current manager's store
         store = None
-        if store_id:
-            try:
-                store = Store.objects.get(id=store_id)
-            except Store.DoesNotExist:
-                print(f"Store with ID {store_id} not found")
+        if current_user and current_user.store:
+            store = current_user.store
+            print(f"Auto-assigning store: {store.name} (ID: {store.id})")
+        else:
+            # Fallback: try to get store from request data
+            store_id = request_data.get('store')
+            if store_id:
+                try:
+                    store = Store.objects.get(id=store_id)
+                    print(f"Using store from request: {store.name} (ID: {store.id})")
+                except Store.DoesNotExist:
+                    print(f"Store with ID {store_id} not found")
         
         user_data = {
             'username': request_data.get('username'),
@@ -315,23 +329,43 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
         # Set tenant based on store or current user
         if store:
             user.tenant = store.tenant
-        elif hasattr(self.context.get('request', None), 'user') and self.context['request'].user.tenant:
-            user.tenant = self.context['request'].user.tenant
+        elif current_user and current_user.tenant:
+            user.tenant = current_user.tenant
         
         user.save()
         
-        # Create team member with only team member fields
-        team_member = TeamMember.objects.create(user=user, **team_member_data)
+        # Generate unique employee_id
+        import random
+        while True:
+            employee_id = random.randint(1000, 9999)
+            if not TeamMember.objects.filter(employee_id=employee_id).exists():
+                break
         
-        # Set manager if provided
+        # Create team member with unique employee_id
+        team_member = TeamMember.objects.create(
+            user=user, 
+            employee_id=employee_id,
+            **team_member_data
+        )
+        
+        # Set manager if provided, otherwise set current user as manager
         if manager_id:
             try:
                 manager = TeamMember.objects.get(id=manager_id)
                 team_member.manager = manager
-                team_member.save()
+            except TeamMember.DoesNotExist:
+                pass
+        elif current_user:
+            # Set current user as manager if no manager specified
+            try:
+                current_manager = TeamMember.objects.get(user=current_user)
+                team_member.manager = current_manager
             except TeamMember.DoesNotExist:
                 pass
         
+        team_member.save()
+        
+        print(f"Team member created successfully: {team_member.id}, Employee ID: {employee_id}")
         return team_member
 
     def to_representation(self, instance):

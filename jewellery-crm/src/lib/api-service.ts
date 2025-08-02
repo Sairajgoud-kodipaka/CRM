@@ -10,6 +10,7 @@ interface ApiResponse<T> {
 // Type definitions based on backend models
 interface User {
   id: number;
+  user_id?: number; // For team members, this is the user ID
   username: string;
   email: string;
   first_name: string;
@@ -555,6 +556,8 @@ class ApiService {
     if (params?.category) queryParams.append('category', params.category);
     if (params?.search) queryParams.append('search', params.search);
     if (params?.status) queryParams.append('status', params.status);
+    // Request more products per page to get all products
+    queryParams.append('page_size', '200');
 
     return this.request(`/products/list/${queryParams.toString() ? `?${queryParams}` : ''}`);
   }
@@ -585,6 +588,10 @@ class ApiService {
 
   async getProductCategories(): Promise<ApiResponse<Category[]>> {
     return this.request('/products/categories/');
+  }
+
+  async getProductStats(): Promise<ApiResponse<any>> {
+    return this.request('/products/stats/');
   }
 
   async createProductCategory(categoryData: Partial<Category>): Promise<ApiResponse<Category>> {

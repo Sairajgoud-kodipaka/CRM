@@ -19,6 +19,8 @@ urlpatterns = [
     path('pipeline/<int:pk>/update/', views.SalesPipelineUpdateView.as_view(), name='pipeline-update'),
     path('pipeline/<int:pk>/delete/', views.SalesPipelineDeleteView.as_view(), name='pipeline-delete'),
     path('pipeline/<int:pk>/transition/', views.PipelineStageTransitionView.as_view(), name='pipeline-transition'),
+    path('pipeline/stats/', views.PipelineStatsView.as_view(), name='pipeline-stats'),
+    path('pipeline/stages/', views.PipelineStagesView.as_view(), name='pipeline-stages'),
     path('pipeline/dashboard/', views.PipelineDashboardView.as_view(), name='pipeline-dashboard'),
     path('pipeline/export/', views.PipelineExportView.as_view(), name='pipeline-export'),
 ] 

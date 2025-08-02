@@ -53,6 +53,12 @@ def add_sample_announcements():
             )
             print("✅ Created sample store")
         
+        # Assign store to user if not already assigned
+        if not user.store:
+            user.store = store
+            user.save()
+            print(f"✅ Assigned store {store.name} to user {user.username}")
+        
         # Clear existing announcements
         Announcement.objects.filter(tenant=tenant).delete()
         TeamMessage.objects.filter(tenant=tenant).delete()
@@ -176,6 +182,32 @@ def add_sample_announcements():
         print(f"✅ Created {created_messages} team messages")
         print(f"✅ Total announcements in database: {Announcement.objects.filter(tenant=tenant).count()}")
         print(f"✅ Total team messages in database: {TeamMessage.objects.filter(tenant=tenant).count()}")
+        
+        # Debug filtering
+        print("\n=== Debugging Filtering ===")
+        print(f"User: {user.username}")
+        print(f"User store: {user.store}")
+        print(f"User tenant: {user.tenant}")
+        
+        # Test the filtering logic
+        from django.db.models import Q
+        queryset = Announcement.objects.filter(is_active=True)
+        print(f"Base announcements: {queryset.count()}")
+        
+        if user.tenant:
+            queryset = queryset.filter(tenant=user.tenant)
+            print(f"After tenant filter: {queryset.count()}")
+        
+        if user.store:
+            store_filtered = queryset.filter(
+                Q(target_stores__isnull=True) |  # System-wide
+                Q(target_stores=user.store) |    # Store-specific
+                Q(author__store=user.store)      # Created by same store members
+            ).distinct()
+            print(f"After store filter: {store_filtered.count()}")
+            
+            for ann in store_filtered:
+                print(f"  - {ann.title} (Type: {ann.announcement_type}, Author Store: {ann.author.store})")
         
     except Exception as e:
         print(f"❌ Error adding sample announcements: {e}")

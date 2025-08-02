@@ -9,26 +9,56 @@ import { apiService, Product } from '@/lib/api-service';
 
 export default function ManagerInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState<any>({
+    total_products: 0,
+    active_products: 0,
+    out_of_stock: 0,
+    low_stock: 0,
+    total_value: 0,
+    category_count: 0,
+    recent_products: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
-    fetchProducts();
+    fetchData();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getProducts();
-      if (response.success && response.data && Array.isArray(response.data)) {
-        setProducts(response.data);
+      
+      // Fetch products
+      const productsResponse = await apiService.getProducts();
+      if (productsResponse.success && productsResponse.data) {
+        // Handle paginated response
+        let productsData: Product[] = [];
+        if (Array.isArray(productsResponse.data)) {
+          productsData = productsResponse.data;
+        } else if (typeof productsResponse.data === 'object' && productsResponse.data !== null) {
+          const data = productsResponse.data as any;
+          if (data.results && Array.isArray(data.results)) {
+            productsData = data.results;
+          } else if (data.data && Array.isArray(data.data)) {
+            productsData = data.data;
+          }
+        }
+        setProducts(productsData);
+        console.log(`Loaded ${productsData.length} products`);
       } else {
-        console.warn('Products response is not an array:', response.data);
+        console.warn('Products response is not valid:', productsResponse.data);
         setProducts([]);
       }
+
+      // Fetch stats
+      const statsResponse = await apiService.getProductStats();
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching data:', error);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -46,11 +76,11 @@ export default function ManagerInventoryPage() {
     return matchesSearch && matchesStatus;
   }) : [];
 
-  const stats = [
-    { label: 'Total Items', value: Array.isArray(products) ? products.length : 0 },
-    { label: 'Low Stock', value: Array.isArray(products) ? products.filter(p => p.quantity > 0 && p.quantity <= p.min_quantity).length : 0 },
-    { label: 'Out of Stock', value: Array.isArray(products) ? products.filter(p => p.quantity === 0).length : 0 },
-    { label: 'Inventory Value', value: `₹${(Array.isArray(products) ? (products.reduce((sum, p) => sum + (p.selling_price * p.quantity), 0) / 100000).toFixed(1) : '0.0')}L` },
+  const statsCards = [
+    { label: 'Total Items', value: stats.total_products || 0 },
+    { label: 'Low Stock', value: stats.low_stock || 0 },
+    { label: 'Out of Stock', value: stats.out_of_stock || 0 },
+    { label: 'Inventory Value', value: `₹${((stats.total_value || 0) / 100000).toFixed(1)}L` },
   ];
 
   if (loading) {
@@ -67,7 +97,7 @@ export default function ManagerInventoryPage() {
         <p className="text-text-secondary mt-1">Track and manage your store's inventory</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((s) => (
+        {statsCards.map((s: any) => (
           <Card key={s.label} className="flex flex-col gap-1 p-5">
             <div className="text-xl font-bold text-text-primary">{s.value}</div>
             <div className="text-sm text-text-secondary font-medium">{s.label}</div>

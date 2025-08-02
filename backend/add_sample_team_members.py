@@ -18,6 +18,7 @@ django.setup()
 
 from apps.users.models import User, TeamMember
 from apps.tenants.models import Tenant
+from apps.stores.models import Store
 
 def create_sample_team_members():
     """Create sample team members for testing."""
@@ -31,7 +32,7 @@ def create_sample_team_members():
             'industry': 'Retail',
             'description': 'Premium jewelry retailer',
             'email': 'info@prestigejewelers.com',
-            'phone': '+1 (555) 123-4567',
+            'phone': '+15551234567',
             'subscription_plan': 'professional',
             'subscription_status': 'active',
             'is_active': True
@@ -43,6 +44,24 @@ def create_sample_team_members():
     else:
         print(f"Using existing tenant: {tenant.name}")
     
+    # Get or create a store for the team members
+    store, store_created = Store.objects.get_or_create(
+        name='Mumbai Central Store',
+        tenant=tenant,
+        defaults={
+            'code': 'MCS001',
+            'address': '456 Central Avenue',
+            'city': 'Mumbai',
+            'state': 'Maharashtra',
+            'timezone': 'Asia/Kolkata'
+        }
+    )
+    
+    if store_created:
+        print(f"Created store: {store.name}")
+    else:
+        print(f"Using existing store: {store.name}")
+    
     # Sample team members data
     team_members_data = [
         {
@@ -51,7 +70,7 @@ def create_sample_team_members():
             'first_name': 'John',
             'last_name': 'Doe',
             'role': 'manager',
-            'phone': '+1 (555) 123-4567',
+            'phone': '+15551234567',
             'employee_id': 'EMP001',
             'department': 'Sales',
             'position': 'Store Manager',
@@ -67,7 +86,7 @@ def create_sample_team_members():
             'first_name': 'Sarah',
             'last_name': 'Smith',
             'role': 'inhouse_sales',
-            'phone': '+1 (555) 234-5678',
+            'phone': '+15552345678',
             'employee_id': 'EMP002',
             'department': 'Sales',
             'position': 'Senior Sales Associate',
@@ -83,7 +102,7 @@ def create_sample_team_members():
             'first_name': 'Mike',
             'last_name': 'Johnson',
             'role': 'tele_calling',
-            'phone': '+1 (555) 345-6789',
+            'phone': '+15553456789',
             'employee_id': 'EMP003',
             'department': 'Sales',
             'position': 'Tele-caller',
@@ -99,7 +118,7 @@ def create_sample_team_members():
             'first_name': 'Emma',
             'last_name': 'Wilson',
             'role': 'marketing',
-            'phone': '+1 (555) 456-7890',
+            'phone': '+15554567890',
             'employee_id': 'EMP004',
             'department': 'Marketing',
             'position': 'Marketing Specialist',
@@ -115,7 +134,7 @@ def create_sample_team_members():
             'first_name': 'David',
             'last_name': 'Brown',
             'role': 'inhouse_sales',
-            'phone': '+1 (555) 567-8901',
+            'phone': '+15555678901',
             'employee_id': 'EMP005',
             'department': 'Sales',
             'position': 'Sales Associate',
@@ -141,6 +160,7 @@ def create_sample_team_members():
                 'role': member_data['role'],
                 'phone': member_data['phone'],
                 'tenant': tenant,
+                'store': store,
                 'is_active': True
             }
         )
@@ -153,6 +173,7 @@ def create_sample_team_members():
             user.role = member_data['role']
             user.phone = member_data['phone']
             user.tenant = tenant
+            user.store = store
             user.save()
             print(f"Updated user: {user.username}")
         else:

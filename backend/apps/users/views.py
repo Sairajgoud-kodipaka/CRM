@@ -234,21 +234,41 @@ class TeamMemberListView(generics.ListCreateAPIView):
         user = self.request.user
         queryset = TeamMember.objects.all()
 
+        print(f"TeamMemberListView.get_queryset - User: {user.username}, Role: {user.role}, Tenant: {user.tenant}, Store: {user.store}")
+        print(f"Request headers: {dict(self.request.headers)}")
+
         if user.is_platform_admin:
+            print("User is platform admin - showing all team members")
             pass
         elif user.is_business_admin and user.tenant:
+            print(f"User is business admin - filtering by tenant: {user.tenant}")
             queryset = queryset.filter(user__tenant=user.tenant)
-        elif user.is_manager:
-            queryset = queryset.filter(Q(user=user) | Q(manager__user=user))
+        elif user.is_manager and user.tenant and user.store:
+            # Managers can see all team members in their store
+            print(f"User is manager - filtering by tenant: {user.tenant} and store: {user.store}")
+            queryset = queryset.filter(user__tenant=user.tenant, user__store=user.store)
+        elif user.is_manager and user.tenant:
+            # Managers without specific store can see all team members in their tenant
+            print(f"User is manager without store - filtering by tenant: {user.tenant}")
+            queryset = queryset.filter(user__tenant=user.tenant)
         elif user.role == 'tele_caller' and user.tenant and user.store:
+            print(f"User is tele_caller - filtering by tenant: {user.tenant} and store: {user.store}")
             queryset = queryset.filter(user__tenant=user.tenant, user__store=user.store, user__role='tele_caller')
         else:
+            print(f"User is other role - showing only self")
             queryset = queryset.filter(user=user)
 
         store_id = self.request.query_params.get('store')
         if store_id:
+            print(f"Additional store filter: {store_id}")
             queryset = queryset.filter(user__store_id=store_id)
 
+        print(f"Final queryset count: {queryset.count()}")
+        
+        # Print the actual team members being returned
+        for tm in queryset[:5]:  # Show first 5 for debugging
+            print(f"  - {tm.user.get_full_name()} ({tm.user.username}) - Role: {tm.user.role}")
+        
         return queryset
 
 
@@ -357,17 +377,36 @@ class TeamMemberUpdateView(generics.UpdateAPIView):
         """Filter team members based on user's role and tenant."""
         user = self.request.user
         
+        # Get the user ID from the URL parameter
+        user_id = self.kwargs.get('pk')
+        
         if user.is_platform_admin:
+            # Platform admin can update any team member
+            if user_id:
+                return TeamMember.objects.filter(user_id=user_id)
             return TeamMember.objects.all()
         
         if user.is_business_admin and user.tenant:
+            # Business admin can update team members in their tenant
+            if user_id:
+                return TeamMember.objects.filter(user_id=user_id, user__tenant=user.tenant)
             return TeamMember.objects.filter(user__tenant=user.tenant)
         
         if user.is_manager:
+            # Manager can update team members they manage or in their store
+            if user_id:
+                return TeamMember.objects.filter(
+                    user_id=user_id
+                ).filter(
+                    Q(user=user) | Q(manager__user=user) | Q(user__store=user.store)
+                )
             return TeamMember.objects.filter(
-                Q(user=user) | Q(manager__user=user)
+                Q(user=user) | Q(manager__user=user) | Q(user__store=user.store)
             )
         
+        # Other users can only update themselves
+        if user_id:
+            return TeamMember.objects.filter(user_id=user_id, user=user)
         return TeamMember.objects.filter(user=user)
 
     def perform_update(self, serializer):
@@ -424,17 +463,36 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
         """Filter team members based on user's role and tenant."""
         user = self.request.user
         
+        # Get the user ID from the URL parameter
+        user_id = self.kwargs.get('pk')
+        
         if user.is_platform_admin:
+            # Platform admin can delete any team member
+            if user_id:
+                return TeamMember.objects.filter(user_id=user_id)
             return TeamMember.objects.all()
         
         if user.is_business_admin and user.tenant:
+            # Business admin can delete team members in their tenant
+            if user_id:
+                return TeamMember.objects.filter(user_id=user_id, user__tenant=user.tenant)
             return TeamMember.objects.filter(user__tenant=user.tenant)
         
         if user.is_manager:
+            # Manager can delete team members they manage or in their store
+            if user_id:
+                return TeamMember.objects.filter(
+                    user_id=user_id
+                ).filter(
+                    Q(user=user) | Q(manager__user=user) | Q(user__store=user.store)
+                )
             return TeamMember.objects.filter(
-                Q(user=user) | Q(manager__user=user)
+                Q(user=user) | Q(manager__user=user) | Q(user__store=user.store)
             )
         
+        # Other users can only delete themselves
+        if user_id:
+            return TeamMember.objects.filter(user_id=user_id, user=user)
         return TeamMember.objects.filter(user=user)
 
     def perform_destroy(self, instance):
@@ -878,7 +936,6 @@ def login_view(request):
             # Check multiple demo passwords
             demo_passwords = ['demo123', 'password123', 'admin123']
             if password in demo_passwords:
-                user = user
                 print(f"Demo password accepted: {password}")
             else:
                 print(f"Demo password rejected. Expected one of: {demo_passwords}, Got: {password}")
@@ -1010,26 +1067,37 @@ def users_list(request):
 @permission_classes([IsAuthenticated])
 def team_members_list(request):
     """
-    Get list of team members filtered by tenant.
+    Get list of team members filtered by tenant and store.
     """
     from .models import TeamMember
     from .serializers import TeamMemberListSerializer
     user = request.user
     
-    # Filter team members based on user's role and tenant
+    print(f"team_members_list - User: {user.username}, Role: {user.role}, Tenant: {user.tenant}, Store: {user.store}")
+    
+    # Filter team members based on user's role, tenant, and store
     if user.is_platform_admin:
         # Platform admin can see all team members
+        print("User is platform admin - showing all team members")
         team_members = TeamMember.objects.filter(user__is_active=True)
     elif user.is_business_admin and user.tenant:
         # Business admin can only see team members from their tenant
+        print(f"User is business admin - filtering by tenant: {user.tenant}")
         team_members = TeamMember.objects.filter(user__is_active=True, user__tenant=user.tenant)
+    elif user.is_manager and user.tenant and user.store:
+        # Manager can see all team members in their store
+        print(f"User is manager - filtering by tenant: {user.tenant} and store: {user.store}")
+        team_members = TeamMember.objects.filter(user__is_active=True, user__tenant=user.tenant, user__store=user.store)
     elif user.is_manager and user.tenant:
-        # Manager can see team members from their tenant
+        # Manager without specific store can see all team members in their tenant
+        print(f"User is manager without store - filtering by tenant: {user.tenant}")
         team_members = TeamMember.objects.filter(user__is_active=True, user__tenant=user.tenant)
     else:
         # Other users can only see themselves
+        print(f"User is other role - showing only self")
         team_members = TeamMember.objects.filter(user__is_active=True, user=user)
     
+    print(f"Found {team_members.count()} team members")
     serializer = TeamMemberListSerializer(team_members, many=True)
     return Response(serializer.data)
 

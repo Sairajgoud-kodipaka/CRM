@@ -40,12 +40,34 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         if user.tenant:
             queryset = queryset.filter(tenant=user.tenant)
         
+        # Filter by store - show announcements for user's store or store-specific announcements
+        if user.store:
+            # Show announcements that are either:
+            # 1. System-wide announcements (no target_stores)
+            # 2. Store-specific announcements targeting this user's store
+            # 3. Team-specific announcements created by users from the same store
+            queryset = queryset.filter(
+                Q(target_stores__isnull=True) |  # System-wide
+                Q(target_stores=user.store) |    # Store-specific
+                Q(author__store=user.store)      # Created by same store members
+            ).distinct()
+        else:
+            # If user has no store, show all announcements for the tenant
+            print(f"User {user.username} has no store assigned, showing all tenant announcements")
+        
         # Filter by publish date and expiration
         now = timezone.now()
         queryset = queryset.filter(
             Q(publish_at__lte=now) &
             (Q(expires_at__isnull=True) | Q(expires_at__gt=now))
         )
+        
+        # Debug: Print the final queryset count
+        print(f"Final announcements count for user {user.username}: {queryset.count()}")
+        
+        # Debug: Print the actual announcements being returned
+        for ann in queryset:
+            print(f"  - {ann.title} (Type: {ann.announcement_type}, Author: {ann.author.username})")
         
         return queryset.distinct()
 
@@ -57,7 +79,16 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return AnnouncementSerializer
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, tenant=self.request.user.tenant)
+        # Automatically set the user's store as target for team-specific announcements
+        announcement = serializer.save(author=self.request.user, tenant=self.request.user.tenant)
+        
+        # If it's a team-specific announcement and user has a store, add the store as target
+        if (announcement.announcement_type == 'team_specific' and 
+            self.request.user.store and 
+            not announcement.target_stores.exists()):
+            announcement.target_stores.add(self.request.user.store)
+        
+        return announcement
 
     @action(detail=True, methods=['post'])
     def mark_as_read(self, request, pk=None):
@@ -148,6 +179,10 @@ class TeamMessageViewSet(viewsets.ModelViewSet):
         # Filter by tenant
         if user.tenant:
             queryset = queryset.filter(tenant=user.tenant)
+        
+        # Filter by store - show messages from user's store
+        if user.store:
+            queryset = queryset.filter(store=user.store)
         
         return queryset.distinct()
 

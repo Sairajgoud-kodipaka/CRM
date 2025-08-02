@@ -204,6 +204,96 @@ class PipelineStageTransitionView(generics.GenericAPIView):
             )
 
 
+class PipelineStatsView(generics.GenericAPIView):
+    """Get pipeline statistics"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            tenant = request.user.tenant
+            
+            # Get all pipelines for the tenant
+            pipelines = SalesPipeline.objects.filter(tenant=tenant)
+            
+            # Calculate statistics
+            active_pipelines = pipelines.exclude(
+                stage__in=[SalesPipeline.Stage.CLOSED_WON, SalesPipeline.Stage.CLOSED_LOST]
+            )
+            
+            total_value = active_pipelines.aggregate(
+                total=Sum('expected_value')
+            )['total'] or Decimal('0')
+            
+            active_deals = active_pipelines.count()
+            total_deals = pipelines.count()
+            won_deals = pipelines.filter(stage=SalesPipeline.Stage.CLOSED_WON).count()
+            
+            conversion_rate = (won_deals / total_deals * 100) if total_deals > 0 else 0
+            avg_deal_size = (total_value / active_deals) if active_deals > 0 else 0
+            
+            return Response({
+                'totalValue': float(total_value),
+                'activeDeals': active_deals,
+                'conversionRate': round(conversion_rate, 1),
+                'avgDealSize': float(avg_deal_size),
+            })
+        except Exception as e:
+            print(f"Error in PipelineStatsView: {str(e)}")
+            return Response(
+                {'error': 'Internal server error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PipelineStagesView(generics.GenericAPIView):
+    """Get pipeline stages with statistics"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            tenant = request.user.tenant
+            
+            stages_data = []
+            for stage_code, stage_name in SalesPipeline.Stage.choices:
+                pipelines = SalesPipeline.objects.filter(
+                    tenant=tenant,
+                    stage=stage_code
+                )
+                
+                count = pipelines.count()
+                value = pipelines.aggregate(
+                    total=Sum('expected_value')
+                )['total'] or Decimal('0')
+                
+                stages_data.append({
+                    'label': stage_name,
+                    'value': float(value),
+                    'count': count,
+                    'color': self.get_stage_color(stage_code)
+                })
+            
+            return Response(stages_data)
+        except Exception as e:
+            print(f"Error in PipelineStagesView: {str(e)}")
+            return Response(
+                {'error': 'Internal server error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def get_stage_color(self, stage_code):
+        """Get color for each stage"""
+        colors = {
+            'lead': 'bg-gray-500',
+            'contacted': 'bg-blue-500',
+            'qualified': 'bg-yellow-500',
+            'proposal': 'bg-orange-500',
+            'negotiation': 'bg-purple-500',
+            'closed_won': 'bg-green-500',
+            'closed_lost': 'bg-red-500',
+        }
+        return colors.get(stage_code, 'bg-gray-400')
+
+
 class PipelineDashboardView(generics.GenericAPIView):
     """Get pipeline dashboard data"""
     permission_classes = [IsAuthenticated]

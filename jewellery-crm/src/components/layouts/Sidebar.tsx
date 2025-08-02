@@ -312,26 +312,6 @@ const navigationItems: NavItem[] = [
     roles: ['manager'],
   },
   {
-    title: 'Support',
-    href: '/manager/support',
-    icon: MessageSquare,
-    roles: ['manager'],
-    children: [
-      {
-        title: 'Tickets',
-        href: '/manager/support/tickets',
-        icon: MessageSquare,
-        roles: ['manager'],
-      },
-      {
-        title: 'New Ticket',
-        href: '/manager/support/tickets/new',
-        icon: Plus,
-        roles: ['manager'],
-      },
-    ],
-  },
-  {
     title: 'Analytics',
     href: '/manager/analytics',
     icon: BarChart3,
