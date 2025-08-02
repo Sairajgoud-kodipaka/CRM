@@ -1,0 +1,6 @@
+name,sku,category,selling_price,cost_price,quantity,description
+Gold Ring MJ01,MJ01,Rings,25000,20000,10,Beautiful gold ring with diamond
+Silver Necklace MJ02,MJ02,Necklaces,15000,12000,5,Elegant silver necklace
+Platinum Bracelet MJ03,MJ03,Bracelets,35000,28000,8,Premium platinum bracelet
+Diamond Earrings MJ04,MJ04,Earrings,45000,36000,,Stunning diamond earrings (quantity optional)
+Ruby Pendant MJ05,MJ05,Pendants,18000,14400,6,Ruby pendant with gold chain 
