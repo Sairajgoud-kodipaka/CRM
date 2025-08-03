@@ -134,7 +134,6 @@ export function StoreManagerDashboard() {
   const [storeActivities, setStoreActivities] = React.useState<StoreActivity[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-  const [debugInfo, setDebugInfo] = React.useState<any>({});
   
   const { user, isAuthenticated, login } = useAuth();
   const router = useRouter();
@@ -291,14 +290,38 @@ export function StoreManagerDashboard() {
       try {
         productsResponse = await apiService.getProducts();
         console.log('Products response:', productsResponse);
+        console.log('Products response success:', productsResponse?.success);
+        console.log('Products response data:', productsResponse?.data);
+        console.log('Products response message:', productsResponse?.message);
+        console.log('Products response data type:', typeof productsResponse?.data);
+        console.log('Products response data is array:', Array.isArray(productsResponse?.data));
+        if (productsResponse?.data && typeof productsResponse.data === 'object') {
+          console.log('Products response data keys:', Object.keys(productsResponse.data));
+        }
+        
         if (productsResponse.success && productsResponse.data) {
-          const products = Array.isArray(productsResponse.data) ? productsResponse.data : [];
+          // Handle different response formats like the inventory page
+          let products: Product[] = [];
+          if (Array.isArray(productsResponse.data)) {
+            products = productsResponse.data;
+          } else if (typeof productsResponse.data === 'object' && productsResponse.data !== null) {
+            const data = productsResponse.data as any;
+            if (data.results && Array.isArray(data.results)) {
+              products = data.results;
+            } else if (data.data && Array.isArray(data.data)) {
+              products = data.data;
+            }
+          }
+          
           totalProducts = products.length;
           console.log('Total products found:', totalProducts);
+          console.log('Products data:', products);
+          
           lowStockProducts = products.filter((product: Product) => 
             product.quantity <= product.min_quantity
           ).length;
           console.log('Low stock products:', lowStockProducts);
+          
           // Calculate new arrivals (products created in last 7 days)
           const weekAgo = new Date();
           weekAgo.setDate(weekAgo.getDate() - 7);
@@ -308,9 +331,16 @@ export function StoreManagerDashboard() {
           console.log('New arrivals:', newArrivals);
         } else {
           console.log('❌ Failed to get products:', productsResponse);
+          totalProducts = 0;
+          lowStockProducts = 0;
+          newArrivals = 0;
         }
       } catch (error) {
         console.error('❌ Error fetching products:', error);
+        // Set sample data for demonstration
+        totalProducts = 0;
+        lowStockProducts = 0;
+        newArrivals = 0;
       }
 
       // Fetch sales
@@ -337,9 +367,15 @@ export function StoreManagerDashboard() {
           console.log('Monthly revenue:', monthlyRevenue);
         } else {
           console.log('❌ Failed to get sales:', salesResponse);
+          // Set default values when no sales data
+          todaySales = 0;
+          monthlyRevenue = 0;
         }
       } catch (error) {
         console.error('❌ Error fetching sales:', error);
+        // Set default values when no sales data
+        todaySales = 0;
+        monthlyRevenue = 0;
       }
 
       // Fetch appointments
@@ -432,20 +468,6 @@ export function StoreManagerDashboard() {
       setStoreActivities(activities);
 
       console.log('✅ Dashboard data fetch completed successfully!');
-
-      // Update debug info
-      setDebugInfo({
-        isAuthenticated,
-        hasToken: !!localStorage.getItem('auth-storage'),
-        user: authenticatedUser,
-        apiCalls: {
-          team: teamResponse?.success,
-          customers: customersResponse?.success,
-          products: productsResponse?.success,
-          sales: salesResponse?.success,
-          appointments: appointmentsResponse?.success,
-        }
-      });
 
     } catch (error) {
       console.error('❌ Error fetching dashboard data:', error);
@@ -702,18 +724,37 @@ export function StoreManagerDashboard() {
             <Package className="w-6 h-6 text-green-500" />
           </div>
           <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Total Products</span>
-              <span className="font-semibold">{storeMetrics.store.inventory.totalProducts}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">New Arrivals</span>
-              <Badge variant="secondary">{storeMetrics.store.inventory.newArrivals}</Badge>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Low Stock</span>
-              <Badge variant="destructive">{storeMetrics.store.inventory.lowStock}</Badge>
-            </div>
+            {storeMetrics.store.inventory.totalProducts > 0 ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Total Products</span>
+                  <span className="font-semibold">{storeMetrics.store.inventory.totalProducts}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">New Arrivals</span>
+                  <Badge variant="secondary">{storeMetrics.store.inventory.newArrivals}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Low Stock</span>
+                  <Badge variant="destructive">{storeMetrics.store.inventory.lowStock}</Badge>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <Package className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <p className="text-sm text-muted-foreground">No inventory data available</p>
+                <p className="text-xs text-muted-foreground mt-1">Add products to see inventory status</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={navigateToInventory}
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  Manage Inventory
+                </Button>
+              </div>
+            )}
           </div>
         </CardContainer>
 
@@ -781,63 +822,6 @@ export function StoreManagerDashboard() {
           </Button>
         </div>
       </CardContainer>
-
-      {/* Debug Panel - Only show if there are issues */}
-      {Object.values(debugInfo.apiCalls || {}).some(success => success === false) && (
-        <CardContainer className="border-l-4 border-l-yellow-500">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Debug Information</h3>
-              <p className="text-sm text-muted-foreground">API connection status</p>
-            </div>
-            <AlertCircle className="w-6 h-6 text-yellow-500" />
-          </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Authentication:</span>
-              <Badge variant={debugInfo.isAuthenticated ? "default" : "destructive"}>
-                {debugInfo.isAuthenticated ? "Authenticated" : "Not Authenticated"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Token:</span>
-              <Badge variant={debugInfo.hasToken ? "default" : "destructive"}>
-                {debugInfo.hasToken ? "Present" : "Missing"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Team API:</span>
-              <Badge variant={debugInfo.apiCalls?.team ? "default" : "destructive"}>
-                {debugInfo.apiCalls?.team ? "Success" : "Failed"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Customers API:</span>
-              <Badge variant={debugInfo.apiCalls?.customers ? "default" : "destructive"}>
-                {debugInfo.apiCalls?.customers ? "Success" : "Failed"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Products API:</span>
-              <Badge variant={debugInfo.apiCalls?.products ? "default" : "destructive"}>
-                {debugInfo.apiCalls?.products ? "Success" : "Failed"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Sales API:</span>
-              <Badge variant={debugInfo.apiCalls?.sales ? "default" : "destructive"}>
-                {debugInfo.apiCalls?.sales ? "Success" : "Failed"}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span>Appointments API:</span>
-              <Badge variant={debugInfo.apiCalls?.appointments ? "default" : "destructive"}>
-                {debugInfo.apiCalls?.appointments ? "Success" : "Failed"}
-              </Badge>
-            </div>
-          </div>
-        </CardContainer>
-      )}
     </DashboardLayout>
   );
 }

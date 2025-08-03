@@ -562,6 +562,23 @@ class ApiService {
     return this.request(`/products/list/${queryParams.toString() ? `?${queryParams}` : ''}`);
   }
 
+  async getMyProducts(params?: {
+    page?: number;
+    category?: string;
+    search?: string;
+    status?: string;
+  }): Promise<ApiResponse<Product[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    // Request more products per page to get all products
+    queryParams.append('page_size', '200');
+
+    return this.request(`/products/${queryParams.toString() ? `?${queryParams}` : ''}`);
+  }
+
   async getProduct(id: string): Promise<ApiResponse<Product>> {
     return this.request(`/products/${id}/`);
   }
@@ -637,7 +654,7 @@ class ApiService {
     if (params?.date_from) queryParams.append('date_from', params.date_from);
     if (params?.date_to) queryParams.append('date_to', params.date_to);
 
-    return this.request(`/sales/list/${queryParams.toString() ? `?${queryParams}` : ''}`);
+    return this.request(`/sales/${queryParams.toString() ? `?${queryParams}` : ''}`);
   }
 
   async getSale(id: string): Promise<ApiResponse<Sale>> {
